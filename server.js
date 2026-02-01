@@ -34,7 +34,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Configure multer for file uploads
-const upload = multer({ 
+const upload = multer({
     dest: 'uploads/',
     limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
@@ -60,25 +60,26 @@ async function ensureDirectories() {
  */
 async function executePython(args) {
     return new Promise((resolve, reject) => {
-        const python = spawn("D:/Surya2Boomi_Web/files/venv/Scripts/python.exe", [PYTHON_SCRIPT, ...args]);
-        
+        const pythonPath = process.env.PYTHON_PATH || 'python';
+        const python = spawn(pythonPath, [PYTHON_SCRIPT, ...args]);
+
         let stdout = '';
         let stderr = '';
-        
+
         python.stdout.on('data', (data) => {
             stdout += data.toString();
         });
-        
+
         python.stderr.on('data', (data) => {
             stderr += data.toString();
         });
-        
+
         python.on('close', (code) => {
             if (code !== 0) {
                 reject(new Error(`Python script failed: ${stderr}`));
                 return;
             }
-            
+
             try {
                 const result = JSON.parse(stdout);
                 resolve(result);
@@ -86,7 +87,7 @@ async function executePython(args) {
                 reject(new Error(`Failed to parse Python output: ${err.message}`));
             }
         });
-        
+
         python.on('error', (err) => {
             reject(new Error(`Failed to start Python: ${err.message}`));
         });
@@ -124,10 +125,10 @@ app.get('/health', async (req, res) => {
     try {
         // Check if model file exists
         await fs.access(MODEL_PATH);
-        
+
         // Check if Python script exists
         await fs.access(PYTHON_SCRIPT);
-        
+
         res.json({
             status: 'healthy',
             timestamp: new Date().toISOString(),
@@ -155,7 +156,7 @@ app.get('/health', async (req, res) => {
 app.post('/predict/single', async (req, res) => {
     try {
         const { datetime, flare_probability } = req.body;
-        
+
         // Validate input
         if (!datetime || flare_probability === undefined) {
             return res.status(400).json({
@@ -163,23 +164,23 @@ app.post('/predict/single', async (req, res) => {
                 error: 'Missing required fields: datetime, flare_probability'
             });
         }
-        
+
         if (flare_probability < 0 || flare_probability > 1) {
             return res.status(400).json({
                 success: false,
                 error: 'flare_probability must be between 0 and 1'
             });
         }
-        
+
         // Execute Python prediction
         const result = await executePython([datetime, flare_probability.toString()]);
-        
+
         if (!result.success) {
             return res.status(500).json(result);
         }
-        
+
         res.json(result);
-        
+
     } catch (err) {
         res.status(500).json({
             success: false,
@@ -203,17 +204,17 @@ app.post('/predict/single', async (req, res) => {
 app.post('/predict/batch', async (req, res) => {
     try {
         const { forecasts } = req.body;
-        
+
         if (!forecasts || !Array.isArray(forecasts) || forecasts.length === 0) {
             return res.status(400).json({
                 success: false,
                 error: 'Missing or invalid forecasts array'
             });
         }
-        
+
         // Create temporary CSV
         const tempCsvPath = path.join('uploads', `temp_${Date.now()}.csv`);
-        
+
         // Write CSV
         let csvContent = 'DateTime,flare_probability\n';
         for (const forecast of forecasts) {
@@ -225,25 +226,25 @@ app.post('/predict/batch', async (req, res) => {
             }
             csvContent += `${forecast.datetime},${forecast.flare_probability}\n`;
         }
-        
+
         await fs.writeFile(tempCsvPath, csvContent);
-        
+
         // Execute Python prediction
         const result = await executePython(['batch', tempCsvPath]);
-        
+
         // Clean up temp file
         try {
             await fs.unlink(tempCsvPath);
         } catch (err) {
             console.error('Error deleting temp file:', err);
         }
-        
+
         if (!result.success) {
             return res.status(500).json(result);
         }
-        
+
         res.json(result);
-        
+
     } catch (err) {
         res.status(500).json({
             success: false,
@@ -267,23 +268,23 @@ app.post('/predict/upload', upload.single('file'), async (req, res) => {
                 error: 'No file uploaded'
             });
         }
-        
+
         // Execute Python prediction
         const result = await executePython(['batch', req.file.path]);
-        
+
         // Clean up uploaded file
         try {
             await fs.unlink(req.file.path);
         } catch (err) {
             console.error('Error deleting uploaded file:', err);
         }
-        
+
         if (!result.success) {
             return res.status(500).json(result);
         }
-        
+
         res.json(result);
-        
+
     } catch (err) {
         res.status(500).json({
             success: false,
@@ -301,7 +302,7 @@ app.post('/predict/upload', upload.single('file'), async (req, res) => {
 app.get('/predict/csv/:filename', async (req, res) => {
     try {
         const { filename } = req.params;
-        
+
         // Security: prevent directory traversal
         if (filename.includes('..') || filename.includes('/')) {
             return res.status(400).json({
@@ -309,9 +310,9 @@ app.get('/predict/csv/:filename', async (req, res) => {
                 error: 'Invalid filename'
             });
         }
-        
+
         const csvPath = path.join(FORECASTS_DIR, filename);
-        
+
         // Check if file exists
         try {
             await fs.access(csvPath);
@@ -321,16 +322,16 @@ app.get('/predict/csv/:filename', async (req, res) => {
                 error: `File not found: ${filename}`
             });
         }
-        
+
         // Execute Python prediction
         const result = await executePython(['batch', csvPath]);
-        
+
         if (!result.success) {
             return res.status(500).json(result);
         }
-        
+
         res.json(result);
-        
+
     } catch (err) {
         res.status(500).json({
             success: false,
@@ -347,13 +348,13 @@ app.get('/forecasts', async (req, res) => {
     try {
         const files = await fs.readdir(FORECASTS_DIR);
         const csvFiles = files.filter(f => f.endsWith('.csv'));
-        
+
         res.json({
             success: true,
             count: csvFiles.length,
             files: csvFiles
         });
-        
+
     } catch (err) {
         res.status(500).json({
             success: false,
@@ -389,38 +390,38 @@ info = {
 
 print(json.dumps(info))
 `;
-        
+
         // Write temp Python script
         const tempScript = path.join('uploads', `info_${Date.now()}.py`);
         await fs.writeFile(tempScript, pythonCode);
-        
+
         // Execute
         const python = spawn('python3', [tempScript]);
-        
+
         let stdout = '';
         let stderr = '';
-        
+
         python.stdout.on('data', (data) => {
             stdout += data.toString();
         });
-        
+
         python.stderr.on('data', (data) => {
             stderr += data.toString();
         });
-        
+
         python.on('close', async (code) => {
             // Clean up
             try {
                 await fs.unlink(tempScript);
-            } catch (err) {}
-            
+            } catch (err) { }
+
             if (code !== 0) {
                 return res.status(500).json({
                     success: false,
                     error: stderr
                 });
             }
-            
+
             try {
                 const info = JSON.parse(stdout);
                 res.json({
@@ -434,7 +435,7 @@ print(json.dumps(info))
                 });
             }
         });
-        
+
     } catch (err) {
         res.status(500).json({
             success: false,
@@ -518,7 +519,7 @@ async function startServer() {
     try {
         // Initialize directories
         await ensureDirectories();
-        
+
         // Check if model exists
         try {
             await fs.access(MODEL_PATH);
@@ -527,7 +528,7 @@ async function startServer() {
             console.warn('⚠ Model file not found:', MODEL_PATH);
             console.warn('  Please ensure hf_blackout_model.pkl is in the same directory');
         }
-        
+
         // Check if Python script exists
         try {
             await fs.access(PYTHON_SCRIPT);
@@ -536,7 +537,7 @@ async function startServer() {
             console.warn('⚠ Python script not found:', PYTHON_SCRIPT);
             console.warn('  Please ensure predict.py is in the same directory');
         }
-        
+
         // Start server
         app.listen(PORT, () => {
             console.log('\n' + '='.repeat(70));
@@ -558,7 +559,7 @@ async function startServer() {
             console.log('\n' + '='.repeat(70));
             console.log('\nReady to accept requests!\n');
         });
-        
+
     } catch (err) {
         console.error('Failed to start server:', err);
         process.exit(1);

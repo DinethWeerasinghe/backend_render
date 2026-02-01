@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: hf-blackout-forecasting-api
+    env: node
+    buildCommand: npm install && pip3 install -r requirements.txt
+    startCommand: node server.js
+    envVars:
+      - key: PYTHON_PATH
+        value: python3
