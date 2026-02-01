@@ -1,0 +1,34 @@
+{
+  "name": "hf-blackout-forecasting-api",
+  "version": "1.0.0",
+  "description": "HF Radio Blackout Forecasting API - Node.js backend using Python ML model",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "test": "node test-api.js"
+  },
+  "keywords": [
+    "hf",
+    "radio",
+    "blackout",
+    "forecasting",
+    "solar",
+    "flare",
+    "machine-learning",
+    "api"
+  ],
+  "author": "HF Blackout Forecasting Team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "multer": "^1.4.5-lts.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": "18.x"
+  }
+}
